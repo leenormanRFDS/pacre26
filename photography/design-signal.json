@@ -1,0 +1,20 @@
+{
+  "craft_state": {
+    "photography": {
+      "source": "Client Archive.zip, inspected 13 October 2026",
+      "independent_photographs": 9,
+      "transparent_derivatives": 1,
+      "lighting": "Retain neutral-warm interiors, cooler daylight skies, warmer roof-detail shadows",
+      "optics": "Preserve original wide-angle perspective; lens/focal length not verified",
+      "materials": "Retain photographic cladding, glass, wall texture, timber-tone and seating appearance; no source-material provenance claim",
+      "hero_desktop": "PACRE-198.jpg",
+      "hero_mobile": "PACRE-197.jpg",
+      "health": "PACRE-191.jpg",
+      "education_detail": "PACRE-192.jpg",
+      "training_detail": "PACRE-193.jpg",
+      "community": "PACRE-194.jpg",
+      "retouching": "None; originals unchanged",
+      "unresolved": "Licensed Museo Sans webfonts absent; exact floor allocation unverified"
+    }
+  }
+}

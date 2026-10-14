@@ -1,0 +1,14 @@
+{
+  "name": "pacre-model-build",
+  "private": true,
+  "type": "module",
+  "description": "Builds site/assets/port-augusta-centre.glb from the source model.",
+  "scripts": { "build": "node build-model.mjs" },
+  "dependencies": {
+    "@gltf-transform/core": "^4",
+    "@gltf-transform/extensions": "^4",
+    "@gltf-transform/functions": "^4",
+    "meshoptimizer": "^0.22",
+    "three": "0.170.0"
+  }
+}

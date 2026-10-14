@@ -397,15 +397,28 @@ header.title-hidden .site-title{opacity:0}
 @media (max-height:520px) and (orientation:landscape){.site-title{font-size:12px;max-width:none}}
 
 /* ==========================================================================
-   The one call to action: Visit RFDS SA & NT
+   The one call to action: Visit RFDS SA & NT. A light frosted-glass pill:
+   translucent white, a hairline edge, a bright top highlight and a soft
+   blue shadow, with blue text at 500 and a cyan arrow. The backdrop blur
+   only shows when something sits behind the button; on plain ivory it reads
+   as frosted glass from the fill, edge and highlight.
    ========================================================================== */
-.cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 24px;border-radius:999px;background:var(--blue);color:#fff!important;font-weight:700;font-size:15px;letter-spacing:.01em;text-decoration:none;border:0!important;transition:background .2s}
-.cta:hover{background:#00346a}
-.cta span{font-size:14px}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 26px;border-radius:999px;
+  color:var(--blue)!important;font-weight:500;font-size:15px;letter-spacing:.01em;text-decoration:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.42));
+  border:1px solid rgba(0,70,132,.15)!important;
+  box-shadow:inset 0 1px 0 #fff,0 10px 28px -14px rgba(0,70,132,.36),0 2px 6px -3px rgba(0,70,132,.12);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);
+  transition:background .25s,border-color .25s,box-shadow .25s,transform .25s}
+.cta span{font-size:14px;color:var(--cyan);transition:transform .25s}
+.cta:hover{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.66));border-color:rgba(0,141,199,.5)!important;box-shadow:inset 0 1px 0 #fff,0 14px 32px -14px rgba(0,70,132,.42),0 2px 6px -3px rgba(0,70,132,.14);transform:translateY(-1px)}
+.cta:hover span{transform:translate(2px,-2px)}
+.cta:active{transform:none;box-shadow:inset 0 1px 0 #fff,0 6px 18px -12px rgba(0,70,132,.36)}
+@media (prefers-reduced-motion:reduce){.cta,.cta span{transition:none}.cta:hover,.cta:hover span{transform:none}}
 .faq{row-gap:0}
 .faq-cta{grid-column:2;margin:40px 0 0}
 @media (max-width:800px){.cta{min-height:46px}.faq-cta{grid-column:auto;margin-top:28px}}
-@media (max-height:520px) and (orientation:landscape){.cta{min-height:42px;font-size:13px;padding:0 18px}}
+@media (max-height:520px) and (orientation:landscape){.cta{min-height:40px;font-size:13px;padding:0 18px;gap:8px}.cta span{font-size:12px}}
 
 /* ==========================================================================
    Map: a still satellite image with the centre marked. Clickable only while
@@ -427,6 +440,16 @@ header.title-hidden .site-title{opacity:0}
 @media (max-width:800px){.partner-logos{margin-top:26px}}
 @media (max-width:800px) and (max-height:700px){.partner-logos{margin-top:20px}}
 @media (max-height:520px) and (orientation:landscape){.partner-logos{margin-top:12px}}
+
+/* More room between the logos and the call to action. The Partners text sits
+   a touch lower on wider screens so the taller block still clears the header. */
+.cta-row{margin-top:38px}
+@media (min-width:801px) and (max-width:1180px) and (min-height:560px){.cta-row{margin-top:30px}}
+@media (min-width:1181px) and (min-height:521px) and (max-height:820px){.cta-row{margin-top:30px}}
+@media (min-width:801px) and (min-height:521px){.panel[data-beat="7"]{top:calc(50% + 12px)}}
+@media (max-width:800px){.cta-row{margin-top:28px}}
+@media (max-width:800px) and (max-height:700px){.cta-row{margin-top:22px}}
+@media (max-height:520px) and (orientation:landscape){.cta-row{margin-top:13px;row-gap:0}}
 
 /* ==========================================================================
    Pacing. Each chapter is as long as what it holds: about a screen per photo,

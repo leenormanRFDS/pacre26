@@ -1,0 +1,31 @@
+/* FAQ: every question has its own link (e.g. #faq-when-open). Opening a link
+   to a question opens that answer; opening a question puts its link in the
+   address bar, ready to copy and share. */
+(() => {
+  const openFromHash = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const item = id && document.getElementById(id);
+    if (item && item.tagName === 'DETAILS') { item.open = true; item.scrollIntoView({block: 'start'}); }
+  };
+  document.querySelectorAll('.faq details').forEach(item => item.addEventListener('toggle', () => {
+    if (item.open && location.hash !== '#' + item.id) history.replaceState(null, '', '#' + item.id);
+  }));
+  addEventListener('hashchange', openFromHash);
+  openFromHash();
+
+  // Solid header once the FAQ reaches it (checked at most once a frame while scrolling).
+  const header = document.querySelector('header'), faq = document.getElementById('faq');
+  let queued = false;
+  const check = () => { queued = false; header.classList.toggle('solid', faq.getBoundingClientRect().top < header.offsetHeight); };
+  addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(check); } }, {passive: true});
+  addEventListener('resize', check); check();
+
+  // The web font arrives after first paint and re-wraps the text above the FAQ,
+  // which pushes a linked answer down the page. Line it up again once fonts and
+  // images have loaded, unless the reader has already started scrolling.
+  let readerMoved = false;
+  for (const type of ['wheel', 'touchstart', 'keydown']) addEventListener(type, () => { readerMoved = true; }, {once: true, passive: true});
+  const settle = () => { if (!readerMoved) openFromHash(); };
+  if (document.fonts) { document.fonts.ready.then(settle); document.fonts.addEventListener('loadingdone', settle); }
+  addEventListener('load', settle);
+})();

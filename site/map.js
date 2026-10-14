@@ -80,15 +80,30 @@ let widget = null, frames = null, started = false, lastKey = '';
 const container = document.querySelector('#map');
 const credits = document.querySelector('#map-credits');
 
+// Download CesiumJS in the background (no running it yet) while the reader is
+// still in the model chapters.
+let prefetched = false;
+function prefetchCesium() {
+  if (prefetched || !container || !MAPBOX_TOKEN) return;
+  prefetched = true;
+  for (const href of [CESIUM_URL + 'Cesium.js', CESIUM_URL + 'Widgets/widgets.css']) {
+    const link = document.createElement('link');
+    link.rel = 'prefetch'; link.href = href; link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  }
+}
+
+// Running CesiumJS and creating the globe takes a second or two of main-thread
+// work on a phone, so it happens while the drone photo is holding still.
 function loadCesium() {
   if (started || !container || !MAPBOX_TOKEN) return;
   started = true;
   window.CESIUM_BASE_URL = CESIUM_URL;
   const css = document.createElement('link');
-  css.rel = 'stylesheet'; css.href = CESIUM_URL + 'Widgets/widgets.css';
+  css.rel = 'stylesheet'; css.href = CESIUM_URL + 'Widgets/widgets.css'; css.crossOrigin = 'anonymous';
   document.head.appendChild(css);
   const script = document.createElement('script');
-  script.src = CESIUM_URL + 'Cesium.js';
+  script.src = CESIUM_URL + 'Cesium.js'; script.crossOrigin = 'anonymous';
   script.onload = () => init().catch(fail);
   script.onerror = () => fail('Cesium did not load');
   document.head.appendChild(script);
@@ -101,7 +116,10 @@ function fail(error) {
 
 async function init() {
   const C = window.Cesium;
-  const imagery = new C.ImageryLayer(new C.MapboxStyleImageryProvider({styleId: 'satellite-v9', accessToken: MAPBOX_TOKEN, tilesize: 512, scaleFactor: true}));
+  // Phones get standard-resolution satellite tiles: the globe is drawn at screen-pixel
+  // resolution, so double-resolution tiles would mostly be thrown away.
+  const imagery = new C.ImageryLayer(new C.MapboxStyleImageryProvider(Object.assign({styleId: 'satellite-v9', accessToken: MAPBOX_TOKEN, tilesize: 512},
+    container.clientWidth >= 600 ? {scaleFactor: true} : {})));   // Cesium adds @2x whenever scaleFactor is present, even if false
   imagery.saturation = 0.82;
   imagery.brightness = 1.04;
 
@@ -120,6 +138,7 @@ async function init() {
   scene.backgroundColor = C.Color.fromCssColorString('#F7F4EE');
   scene.globe.baseColor = C.Color.fromCssColorString('#cdb89a');
   scene.globe.showGroundAtmosphere = false;
+  if (container.clientWidth < 600) scene.globe.maximumScreenSpaceError = 3;   // fewer, coarser tiles on phones
   scene.globe.enableLighting = false;
   scene.fog.enabled = true;
   if (scene.sun) scene.sun.show = false;
@@ -146,7 +165,7 @@ async function init() {
   }));
 
   // The building.
-  const model = await C.Model.fromGltfAsync({url: 'assets/port-augusta-ivory.glb', modelMatrix: placement, scale: SITE.scale, shadows: C.ShadowMode.DISABLED});
+  const model = await C.Model.fromGltfAsync({url: 'assets/port-augusta-centre.glb', modelMatrix: placement, scale: SITE.scale, shadows: C.ShadowMode.DISABLED});
   scene.primitives.add(model);
 
   // Labels, the centre's marker and flight arcs out to the towns.
@@ -188,7 +207,8 @@ function tick() {
   requestAnimationFrame(tick);
   const story = window.rfdsStory;
   if (!story) return;
-  if (story.beat >= 4) loadCesium();
+  if (story.beat >= 4) prefetchCesium();
+  if ((story.beat === 5 && story.local >= 0.62) || story.beat >= 6) loadCesium();
   if (!widget || !frames || story.beat < 5) return;
   const s = story.paused ? Math.floor(story.beat + story.local) + 0.6 : story.beat + story.local;
   const key = s.toFixed(4) + '|' + container.clientWidth + 'x' + container.clientHeight;

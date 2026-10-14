@@ -1,0 +1,82 @@
+[
+  {
+    "file": "PACRE-190.jpg",
+    "width": 3500,
+    "height": 2625,
+    "mode": "RGB",
+    "sha256": "ae95c18752680c16b72640fb1d8a5f84a7846d9bfe5693df75b2b2c7d2e658e9",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-191.jpg",
+    "width": 3500,
+    "height": 2625,
+    "mode": "RGB",
+    "sha256": "ae4eb6f943e49b8b2d7e4435227ed218fb723e065f902507180b6a2112b8d67f",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-192.jpg",
+    "width": 3500,
+    "height": 2515,
+    "mode": "RGB",
+    "sha256": "f3b5ebe0980b44ce7758c8b789698833adb1241a19385e02a1d6aa0968076253",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-193.jpg",
+    "width": 2625,
+    "height": 3500,
+    "mode": "RGB",
+    "sha256": "844913fdc3dc689752e1ce2b273ee1d4843cf541927e275e86aeddcbcd3c573d",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-194.jpg",
+    "width": 3500,
+    "height": 2625,
+    "mode": "RGB",
+    "sha256": "2b8c88d0ecbb7fde8b32f3de20ef6aad8bbb365417575a14be260357465a9e24",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-195.jpg",
+    "width": 3500,
+    "height": 2625,
+    "mode": "RGB",
+    "sha256": "c5aea76edb7b5ba3ff8164898d758d59c6be07f11bbe196133f2456a63ac9fe2",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-196.jpg",
+    "width": 2591,
+    "height": 3500,
+    "mode": "RGB",
+    "sha256": "b9c67b5ede2d11269911f43f58b5bac84b597402a34d02bfadb47a6f6d28aaf6",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-197.jpg",
+    "width": 2625,
+    "height": 3500,
+    "mode": "RGB",
+    "sha256": "65606c91d3dc37da066a7193d255a7082c5ffe8fcfa8c41ee502ed78a18c6167",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-198.jpg",
+    "width": 3500,
+    "height": 2625,
+    "mode": "RGB",
+    "sha256": "00c6a6224b94740fb94af61caf7bc7ab4068b5001ad1b302f9d896d05230ec84",
+    "icc_profile_present": true
+  },
+  {
+    "file": "PACRE-198.png",
+    "width": 2995,
+    "height": 1554,
+    "mode": "RGBA",
+    "sha256": "f783cf2f691498dc245c2c1972b4fb2f62fbb6dbf04b7754609d6661583dd7e6",
+    "icc_profile_present": false
+  }
+]

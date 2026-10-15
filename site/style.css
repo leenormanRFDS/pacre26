@@ -231,15 +231,9 @@
    Snapping, shorter phone chapters, partner logos and the call to action
    ========================================================================== */
 
-/* Invisible snap points at each chapter's composed moments (finished camera
-   move, photo fully in). Touch screens only, and only "proximity": a flick
-   that ends near one settles on it; a flick past it is never pulled back. */
-.track>div{position:relative}
-.snap{position:absolute;left:0;width:1px;height:1px;pointer-events:none}
-@media (hover:none) and (pointer:coarse){
-  html{scroll-snap-type:y proximity}
-  .snap,.information{scroll-snap-align:start}
-}
+/* No scroll snapping. On iPhone, snap points made the page glide on by itself
+   after a flick and pull back a short scroll, which read as jumpy. Scrolling is
+   fully native; story.js eases the picture after the scroll instead. */
 
 /* About a fifth less scrolling on phones. */
 @media (max-width:800px){
@@ -270,6 +264,8 @@
 .floor-photos{position:absolute;inset:0;pointer-events:none;overflow:visible}
 .floor-photo{position:absolute;left:0;top:0;opacity:0;border-radius:16px;background-size:cover;background-repeat:no-repeat;transform-origin:50% 50%;will-change:transform,opacity;box-shadow:0 22px 44px -26px rgba(0,40,77,.45)}
 @media (max-width:800px){.floor-photo{border-radius:12px}}
+.floor-photo{overflow:hidden}
+.floor-photo img{display:block;width:100%;height:100%;object-fit:cover}
 @media (max-width:800px){
   .track>#health{height:150svh}
   .track>#education,.track>#training{height:125svh}
@@ -453,19 +449,17 @@ header.title-hidden .site-title{opacity:0}
 
 /* ==========================================================================
    Pacing. Each chapter is as long as what it holds: about a screen per photo,
-   less for a single move. On touch screens the first composed frame of every
-   chapter is a stop a fast flick cannot pass, so nobody skips a chapter by
-   accident; the other snap points only catch a scroll that ends near them.
+   less for a single move. Phones get a little more room per photo than they
+   had with snapping, so an ordinary flick moves through one change at a time.
    ========================================================================== */
 .track>#opening{height:120svh}.track>#construction{height:135svh}
 .track>#health{height:190svh}.track>#education{height:140svh}.track>#training{height:160svh}
 .track>#together{height:150svh}.track>#community{height:120svh}.track>#partners{height:130svh}
 @media (max-width:800px){
-  .track>#opening,.track>#construction{height:100svh}
-  .track>#health{height:150svh}.track>#education{height:115svh}.track>#training{height:125svh}
-  .track>#together{height:115svh}.track>#community{height:100svh}.track>#partners{height:110svh}
+  .track>#opening{height:100svh}.track>#construction{height:115svh}
+  .track>#health{height:180svh}.track>#education{height:130svh}.track>#training{height:150svh}
+  .track>#together{height:130svh}.track>#community{height:110svh}.track>#partners{height:110svh}
 }
-@media (hover:none) and (pointer:coarse){.snap.stop{scroll-snap-stop:always}.faq{scroll-snap-align:start}}
 
 /* Past the story, the header gets a solid background so the FAQ text never
    scrolls up underneath the lockup or the title. */

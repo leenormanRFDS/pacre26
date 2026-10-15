@@ -2,6 +2,14 @@
 const panels=[...document.querySelectorAll('.panel')],anchors=[...document.querySelectorAll('.track>div[id]')],dots=[...document.querySelectorAll('.chapters a')];
 const a=document.querySelector('#photo-a'),b=document.querySelector('#photo-b'),mask=document.querySelector('#mask-path'),contour=document.querySelector('#contour-path'),caption=document.querySelector('#visual-caption')||{},motion=document.querySelector('#motion');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');let paused=reduced.matches,smooth=0,last=performance.now(),beat=-1;
+/* How the picture follows the scroll. It eases toward the scroll position
+   (FOLLOW_MS) and never runs faster than MAX_RATE chapters a second, so a hard
+   flick plays each change through instead of flashing past it. A jump of more
+   than JUMP chapters (a chapter link, the FAQ link) skips to one chapter short
+   of where it is going and plays only the last change. Touch screens follow a
+   little more softly than a mouse or trackpad. */
+const touch=matchMedia('(hover:none) and (pointer:coarse)');
+const FOLLOW_MS={touch:230,other:130},MAX_RATE={touch:2,other:3},JUMP=2.5;
 const photos=[195,195,'care','sota','training',198,194,197],labels=['THE CENTRE','CONSTRUCTION COMPLETE','HEALTH','EDUCATION','TRAINING','TOGETHER UNDER ONE ROOF','OUR COMMUNITIES','OUR PARTNERS'];
 // Manual, normalized vector interpretations of observed architecture. These are
 // presentation masks, not survey-accurate architectural outlines.
@@ -25,17 +33,19 @@ const FLOOR_PHOTOS={
 };
 const PHOTO_START=.34,PHOTO_END=.93;   // share of each chapter given to its photos
 const visualBox=document.querySelector('.visual'),cardLayer=document.createElement('div');cardLayer.className='floor-photos';visualBox.appendChild(cardLayer);
-const cards={};for(const b in FLOOR_PHOTOS)cards[b]=FLOOR_PHOTOS[b].map(([id,pos])=>{const el=document.createElement('div');el.className='floor-photo';el.dataset.id=id;el.style.backgroundPosition=pos;cardLayer.appendChild(el);return el});
-function loadCards(b){for(const el of cards[b]||[])if(!el.style.backgroundImage)el.style.backgroundImage=`url('${imageUrl(el.dataset.id)}')`}
-// Snap points: the model settled, then each photo at its fullest.
-for(const b in FLOOR_PHOTOS){const anchor=anchors[b];anchor.querySelectorAll('.snap').forEach(n=>n.remove());const n=FLOOR_PHOTOS[b].length,L=(PHOTO_END-PHOTO_START)/n;for(const at of [.3,...FLOOR_PHOTOS[b].map((_,k)=>PHOTO_START+(k+.48)*L)]){const m=document.createElement('i');m.className=at===.3?'snap stop':'snap';m.style.top=(at*100).toFixed(1)+'%';anchor.appendChild(m)}}
+const cards={};for(const b in FLOOR_PHOTOS)cards[b]=FLOOR_PHOTOS[b].map(([id,pos])=>{const el=document.createElement('div');el.className='floor-photo';el.dataset.id=id;const img=document.createElement('img');img.alt='';img.decoding='async';img.style.objectPosition=pos;el.appendChild(img);cardLayer.appendChild(el);return el});
+/* A card only appears once its photograph is downloaded and decoded, so it can
+   never show up as an empty white frame. All of them start loading as soon as
+   the reader starts scrolling, so a fast reader does not outrun them. */
+let cardsRequested=false;
+function loadCards(){if(cardsRequested)return;cardsRequested=true;for(const b in cards)for(const el of cards[b]){const img=el.firstChild;img.src=imageUrl(el.dataset.id);const done=()=>{el.dataset.ready='1';dirty=true};(img.decode?img.decode():new Promise((ok,no)=>{img.onload=ok;img.onerror=no})).then(done,()=>{if(img.complete&&img.naturalWidth)done()})}}
 function placeCards(i,p){
   const box=cardBox||(cardBox=visualBox.getBoundingClientRect()),W=Math.min(box.width*.8,box.height*.78*1.5),H=W/1.5,cx=box.width/2,cy=box.height*.48;
   const an=window.rfdsAnchors||{},floor=an.floor||[cx,box.height*.7],core=an.core||[cx,cy];
   for(const b in cards){const list=cards[b],n=list.length,L=(PHOTO_END-PHOTO_START)/n;
     list.forEach((el,k)=>{
       const t=+b===i?(p-(PHOTO_START+k*L))/L:-1;
-      if(t<=0||t>=1){el.style.opacity='0';return}
+      if(t<=0||t>=1||!el.dataset.ready){el.style.opacity='0';return}
       el.style.width=W+'px';el.style.height=H+'px';
       let x=cx,y=cy,s=1,o=1;
       if(paused){o=ease(t/.15)*(1-ease((t-.85)/.15))}
@@ -58,10 +68,18 @@ let droneLoaded=false;function loadDrone(){if(!droneLoaded){droneLoaded=true;dro
    for its column (or would run into the visual), every chapter headline steps
    down to the size that fits, so they stay consistent with each other. This
    re-runs on resize and when the web font arrives, so copy edits are safe. */
-function fitHeadlines(){const hs=[...document.querySelectorAll('.panel h2')];if(!hs.length)return;hs.forEach(h=>h.style.fontSize='');const vis=document.querySelector('.visual').getBoundingClientRect();let k=1;
+let fitWidth=0;
+function fitHeadlines(){fitWidth=innerWidth;const hs=[...document.querySelectorAll('.panel h2')];if(!hs.length)return;hs.forEach(h=>h.style.fontSize='');const vis=document.querySelector('.visual').getBoundingClientRect();let k=1;
 for(const h of hs){const pr=h.closest('.panel').getBoundingClientRect(),avail=phone.matches||vis.left<pr.left+40?pr.width:Math.min(pr.width,vis.left-pr.left-24);h.style.whiteSpace='nowrap';const need=h.scrollWidth;h.style.whiteSpace='';if(need>avail)k=Math.min(k,avail/need)}
 if(k<1){const size=Math.max(28,Math.floor(parseFloat(getComputedStyle(hs[0]).fontSize)*k))+'px';hs.forEach(h=>h.style.fontSize=size)}}
-function layout(){fitHeadlines();cardBox=null;dirty=true;stage.style.setProperty('--head-h',head.offsetHeight+'px');const p=panels[Math.max(0,beat)];stage.style.setProperty('--text-h',(phone.matches&&p?p.offsetHeight:0)+'px')}
+/* Phones stack the picture above the text, and the picture takes the height the
+   text leaves. The first six chapters share one height (the tallest of their
+   texts), so the 3D model never changes size between chapters, and its canvas
+   is never resized (which blanks it) at a chapter change. The two map chapters
+   size to their own text; story.js fades the map out and in around that change. */
+function layout(){cardBox=null;dirty=true;stage.style.setProperty('--head-h',head.offsetHeight+'px');
+  let h=0;if(phone.matches){const k=Math.max(0,beat);h=k<=5?Math.max(...panels.slice(0,6).map(n=>n.offsetHeight)):panels[k].offsetHeight}
+  stage.style.setProperty('--text-h',h+'px')}
 /* Performance: chapter positions, the page height and the photo frame size are
    measured once (and again on resize or when fonts load), never per frame, and
    the loop does nothing at all while the page is still. */
@@ -69,9 +87,12 @@ let anchorTops=[],anchorHeights=[],journeyRange=1,cardBox=null,dirty=true,lastKe
 const progressBar=document.querySelector('#progress'),journey=document.querySelector('#journey');
 function measure(){anchorTops=anchors.map(n=>n.offsetTop);anchorHeights=anchors.map(n=>n.offsetHeight);journeyRange=Math.max(1,journey.offsetHeight-innerHeight);cardBox=null;dirty=true}
 function destination(){const y=scrollY;let i=0;while(i<anchorTops.length-1&&y>=anchorTops[i+1])i++;return i+clamp((y-anchorTops[i])/anchorHeights[i],0,.99999)}
-function update(now){const dt=Math.max(0,Math.min(80,now-last));last=now;const target=destination();smooth=paused?target:smooth+(target-smooth)*(1-Math.exp(-dt/125));if(Math.abs(target-smooth)<1e-4)smooth=target;
+function update(now){const dt=Math.max(0,Math.min(80,now-last));last=now;const target=destination();
+if(paused)smooth=target;else{const k=touch.matches?'touch':'other';let gap=target-smooth;if(Math.abs(gap)>JUMP){smooth=target-Math.sign(gap);gap=target-smooth}const step=gap*(1-Math.exp(-dt/FOLLOW_MS[k])),cap=MAX_RATE[k]*dt/1000;smooth+=clamp(step,-cap,cap)}
+if(Math.abs(target-smooth)<1e-4)smooth=target;
 {const an=window.rfdsAnchors,key=[smooth.toFixed(5),!!window.rfdsModelReady,!!window.rfdsMapReady,paused,an?String(an.floor)+an.core:''].join('|');if(!dirty&&key===lastKey){requestAnimationFrame(update);return}lastKey=key;dirty=false}const i=Math.max(0,Math.min(7,Math.floor(smooth))),p=smooth-i;
-if(beat!==i){beat=i;layout();loadCards(i);loadCards(i+1);const mapShows=()=>window.rfdsMapReady&&!window.rfdsMapError;if(!(i>=6&&mapShows()))setPhoto(a,photos[i]);if(!(i+1>=6&&mapShows()))setPhoto(b,photos[Math.min(i+1,7)]);if(i>=3)loadDrone();dots.forEach((d,j)=>{if(j===i)d.setAttribute('aria-current','step');else d.removeAttribute('aria-current')});panels.forEach((el,j)=>{el.classList.toggle('active',j===i);el.inert=j!==i})}
+if(i>0||p>.12)loadCards();
+if(beat!==i){beat=i;layout();const mapShows=()=>window.rfdsMapReady&&!window.rfdsMapError;if(!(i>=6&&mapShows()))setPhoto(a,photos[i]);if(!(i+1>=6&&mapShows()))setPhoto(b,photos[Math.min(i+1,7)]);if(i>=3)loadDrone();dots.forEach((d,j)=>{if(j===i)d.setAttribute('aria-current','step');else d.removeAttribute('aria-current')});panels.forEach((el,j)=>{el.classList.toggle('active',j===i);el.inert=j!==i})}
 panels.forEach((el,j)=>{el.style.opacity=j===i?String((i===0?1:ease(p/.10))*(i===7?1:(1-ease((p-.89)/.11)))):'0';if(paused&&j===i)el.style.opacity='1';el.style.translate=j===i&&!paused?`0 ${14*(1-ease(p/.14))}px`:'0 0'});
 /* What is on screen in this chapter. Each value is an opacity from 0 to 1.
    photoA  the chapter's framed photograph       photoB  the next chapter's photograph
@@ -83,10 +104,15 @@ const ready=!!window.rfdsModelReady,mapReady=!!window.rfdsMapReady;if(mapReady&&
 if(i===0){photoA=0;photoB=ease((p-.86)/.14);open=1-photoB}
 else if(i===1){if(ready){photoA=1-ease((p-.70)/.10);model=ease((p-.80)/.15);open=ease((p-.70)/.10)*(1-model)}}
 else if(i>=2&&i<=4){if(ready){photoA=0;model=1}else photoA=1}
-else if(i===5){photoA=0;photoB=ease((p-.89)/.11);if(mapReady){map=photoB;photoB=0}if(ready){const r=ease((p-.24)/.12);model=1-r;drone=1-photoB;sweep=paused?1:r;if(paused)drone*=r;push=paused?1:1+.025*ease((p-.36)/.64)}else drone=1-photoB;if(mapReady)drone=(1-map)*(paused&&ready?ease((p-.24)/.12):1)}
-else photoB=ease((p-.86)/.14);
+// Phones: the picture frame changes height after Together and again for Partners
+// (the text under it changes height), so there it fades out and back in, in step
+// with the text, instead of jumping to the new size in view.
+const fade=phone.matches&&!paused;
+if(i===5){photoA=0;const h=ease((p-.89)/.11),leave=1-h;photoB=fade?0:h;if(mapReady){map=photoB;photoB=0}if(ready){const r=ease((p-.24)/.12);model=1-r;drone=leave;sweep=paused?1:r;if(paused)drone*=r;push=paused?1:1+.025*ease((p-.36)/.64)}else drone=leave;if(mapReady)drone=leave*(paused&&ready?ease((p-.24)/.12):1)}
+else if(i>5)photoB=ease((p-.86)/.14);
 if(i>5)photoA=1-photoB;
 if(i>5&&mapReady){map=1;photoA=0;photoB=0}
+if(i>5&&fade){const show=ease(p/.12)*(i===7?1:1-ease((p-.86)/.14));if(mapReady)map=show;else{photoA=show;photoB=0}}
 // Together: the whole headline and copy arrive with the real building.
 if(i===5&&!paused&&ready){const r=ease((p-.24)/.12);panels[5].style.opacity=String(r*(1-ease((p-.89)/.11)));panels[5].style.translate=`0 ${14*(1-r)}px`}
 mapEl.style.opacity=String(map);mapCredits.style.opacity=String(map);mapEl.style.pointerEvents=map>.6?'auto':'none';
@@ -103,11 +129,14 @@ const photoAlpha=1-model;
 cardLayer.style.display=ready?'':'none';if(ready)placeCards(i,p);
 window.rfdsStory={beat:i,local:p,paused,visible:(i>=2&&i<=5)||(i===1&&p>=.75),photoAlpha,modelAlpha:model};progressBar.style.width=`${100*clamp(scrollY/journeyRange)}%`;requestAnimationFrame(update)}
 if(motion)motion.onclick=()=>{paused=!paused;motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))};if(paused&&motion){motion.textContent='Resume motion';motion.setAttribute('aria-pressed','true')}
-addEventListener('resize',()=>{beat=-1;measure()});reduced.addEventListener('change',e=>{paused=e.matches;if(motion){motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))}});
+// Phone browsers resize the window as their toolbars slide in and out while
+// scrolling; the headlines only need re-fitting when the width changes.
+addEventListener('resize',()=>{if(innerWidth!==fitWidth)fitHeadlines();beat=-1;measure()});reduced.addEventListener('change',e=>{paused=e.matches;if(motion){motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))}});
 // Keyboard and chapter links use native document scrolling; wheel and touch are never hijacked.
 for(const link of document.querySelectorAll('a[href^="#"]'))link.addEventListener('click',e=>{const node=document.querySelector(link.getAttribute('href'));if(!node)return;e.preventDefault();const y=node.closest('.track')?node.offsetTop+node.offsetHeight*.18:node.getBoundingClientRect().top+scrollY;scrollTo({top:y,behavior:paused?'instant':'smooth'});history.replaceState(null,'',link.getAttribute('href'))});
 const query=new URLSearchParams(location.search);if(query.has('scene')){const index=['opening','construction','health','education','training','together','community','partners'].indexOf(query.get('scene'));if(index>=0)scrollTo(0,anchors[index].offsetTop+anchors[index].offsetHeight*clamp(Number(query.get('phase')||.35),.01,.98))}
-measure();smooth=destination();setPhoto(a,195);panels[0].style.opacity='1';requestAnimationFrame(update);
-if(document.fonts){document.fonts.ready.then(()=>{measure();layout()});document.fonts.addEventListener('loadingdone',()=>{measure();layout()})}addEventListener('load',()=>{measure();layout()});
+fitHeadlines();measure();smooth=destination();setPhoto(a,195);panels[0].style.opacity='1';requestAnimationFrame(update);
+const refresh=()=>{fitHeadlines();measure();layout()};
+if(document.fonts){document.fonts.ready.then(refresh);document.fonts.addEventListener('loadingdone',refresh)}addEventListener('load',refresh);
 requestAnimationFrame(()=>requestAnimationFrame(()=>stage.classList.add('ready')));
 })();

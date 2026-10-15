@@ -558,6 +558,7 @@ try {
     world.add(model);
     collectFramePoints();
     refit();
+    warmUp();
     needsRender = true;
 
     window.rfdsModelReady = true;
@@ -591,15 +592,34 @@ try {
     if (camera.aspect !== lastAspect || bleed !== lastBleed) { lastAspect = camera.aspect; lastBleed = bleed; refit(); }
     else placePhotos();
     needsRender = true;
+    // Resizing a canvas wipes it. Redraw straight away: a ResizeObserver runs
+    // before the page is painted, so the model never shows as a blank frame.
+    draw();
   }
   new ResizeObserver(resize).observe(canvas);
   resize();
+
+  // Draw every part of the model once as soon as it arrives, while it is still
+  // hidden, so its shaders are compiled and its geometry is on the graphics chip
+  // before the reader gets to it. Without this the first frame that shows the
+  // model stalls (on iPhone for a few hundred milliseconds) and shows nothing.
+  // The canvas is cleared afterwards so this frame is never seen.
+  function warmUp() {
+    const culled = [];
+    model.traverse(o => { if (o.isMesh) { culled.push([o, o.frustumCulled]); o.frustumCulled = false; } });
+    try { renderer.compile(world, camera); renderer.render(world, camera); renderer.clear(); }
+    catch (error) { console.warn('Model warm-up skipped', error); }
+    for (const [o, c] of culled) o.frustumCulled = c;
+  }
 
   const liftTotal = view => Object.values(view.lift).reduce((s, v) => s + v, 0);
 
   let lastKey = '';
   function frame() {
     requestAnimationFrame(frame);
+    draw();
+  }
+  function draw() {
     const story = window.rfdsStory;
     if (!model || !story || !fits.size) return;
 
@@ -699,9 +719,11 @@ try {
     canvas.dataset.focus = tint.groundShell > 0.5 ? 'ground floor' : tint.upperShell > 0.5 ? 'second floor' : 'whole building';
     canvas.dataset.modelVersion = 'V4, rooms hidden, roof repaired';
 
-    // Nothing to draw while the canvas is hidden.
+    // Nothing to draw while the canvas is hidden. Just before the model fades
+    // in at the end of the second chapter it is drawn anyway, so the canvas
+    // already holds the right picture on the frame it appears.
     const modelAlpha = story.modelAlpha ?? (1 - story.photoAlpha);
-    if (story.visible && modelAlpha > 0.001) renderer.render(world, camera);
+    if (story.visible && (modelAlpha > 0.001 || story.beat === 1)) renderer.render(world, camera);
   }
   frame();
 } catch (error) {

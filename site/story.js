@@ -9,7 +9,7 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)');let paused=reduced.
    of where it is going and plays only the last change. Touch screens follow a
    little more softly than a mouse or trackpad. */
 const touch=matchMedia('(hover:none) and (pointer:coarse)');
-const FOLLOW_MS={touch:230,other:130},MAX_RATE={touch:2,other:3},JUMP=2.5;
+const FOLLOW_MS={touch:300,other:130},MAX_RATE={touch:1.5,other:3},JUMP=2.5;
 const photos=[195,195,'care','sota','training',198,194,197],labels=['THE CENTRE','CONSTRUCTION COMPLETE','HEALTH','EDUCATION','TRAINING','TOGETHER UNDER ONE ROOF','OUR COMMUNITIES','OUR PARTNERS'];
 // Manual, normalized vector interpretations of observed architecture. These are
 // presentation masks, not survey-accurate architectural outlines.
@@ -37,6 +37,16 @@ const cards={};for(const b in FLOOR_PHOTOS)cards[b]=FLOOR_PHOTOS[b].map(([id,pos
 /* A card only appears once its photograph is downloaded and decoded, so it can
    never show up as an empty white frame. All of them start loading as soon as
    the reader starts scrolling, so a fast reader does not outrun them. */
+/* Steps. On phones and tablets the story moves one step per flick and cannot
+   be flicked past a step (style.css makes these points mandatory stops). Each
+   step is a composed moment: a chapter settled, or one of its photos at its
+   fullest. Positions are shares of each chapter's scroll length. */
+const STEPS={0:[0],1:[.25],5:[.45],6:[.35],7:[.45]};
+for(const b in FLOOR_PHOTOS){const n=FLOOR_PHOTOS[b].length,L=(PHOTO_END-PHOTO_START)/n;STEPS[b]=[.3,...FLOOR_PHOTOS[b].map((_,k)=>PHOTO_START+(k+.48)*L)]}
+for(const b in STEPS)for(const at of STEPS[b]){const m=document.createElement('i');m.className='snap';m.style.top=(at*100).toFixed(2)+'%';anchors[b].appendChild(m)}
+// Snapping only starts now: switched on with no story steps in place, the page
+// would settle on the nearest point it could find, the FAQ.
+document.documentElement.classList.add('steps');
 let cardsRequested=false;
 function loadCards(){if(cardsRequested)return;cardsRequested=true;for(const b in cards)for(const el of cards[b]){const img=el.firstChild;img.src=imageUrl(el.dataset.id);const done=()=>{el.dataset.ready='1';dirty=true};(img.decode?img.decode():new Promise((ok,no)=>{img.onload=ok;img.onerror=no})).then(done,()=>{if(img.complete&&img.naturalWidth)done()})}}
 function placeCards(i,p){
@@ -137,7 +147,7 @@ if(motion)motion.onclick=()=>{paused=!paused;motion.textContent=paused?'Resume m
 // scrolling; the headlines only need re-fitting when the width changes.
 addEventListener('resize',()=>{if(innerWidth!==fitWidth)fitHeadlines();beat=-1;measure()});reduced.addEventListener('change',e=>{paused=e.matches;if(motion){motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))}});
 // Keyboard and chapter links use native document scrolling; wheel and touch are never hijacked.
-for(const link of document.querySelectorAll('a[href^="#"]'))link.addEventListener('click',e=>{const node=document.querySelector(link.getAttribute('href'));if(!node)return;e.preventDefault();const y=node.closest('.track')?node.offsetTop+node.offsetHeight*.18:node.getBoundingClientRect().top+scrollY;scrollTo({top:y,behavior:paused?'instant':'smooth'});history.replaceState(null,'',link.getAttribute('href'))});
+for(const link of document.querySelectorAll('a[href^="#"]'))link.addEventListener('click',e=>{const node=document.querySelector(link.getAttribute('href'));if(!node)return;e.preventDefault();const y=node.closest('.track')?node.offsetTop+node.offsetHeight*.18:node.getBoundingClientRect().top+scrollY-(parseFloat(getComputedStyle(node).scrollMarginTop)||0);scrollTo({top:y,behavior:paused?'instant':'smooth'});history.replaceState(null,'',link.getAttribute('href'))});
 const query=new URLSearchParams(location.search);if(query.has('scene')){const index=['opening','construction','health','education','training','together','community','partners'].indexOf(query.get('scene'));if(index>=0)scrollTo(0,anchors[index].offsetTop+anchors[index].offsetHeight*clamp(Number(query.get('phase')||.35),.01,.98))}
 fitHeadlines();measure();smooth=destination();setPhoto(a,195);panels[0].style.opacity='1';requestAnimationFrame(update);
 const refresh=()=>{fitHeadlines();measure();layout()};

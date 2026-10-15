@@ -236,9 +236,21 @@
    Snapping, shorter phone chapters, partner logos and the call to action
    ========================================================================== */
 
-/* No scroll snapping. On iPhone, snap points made the page glide on by itself
-   after a flick and pull back a short scroll, which read as jumpy. Scrolling is
-   fully native; story.js eases the picture after the scroll instead. */
+/* One step per flick on phones and tablets. story.js places a point at every
+   composed moment of the story (a chapter settled, each photo at its fullest).
+   Snapping is mandatory and every point is a stop, so a flick always moves
+   exactly one step: it can never carry the reader past a chapter, and there
+   are no in-between points to pull a scroll back to. In the FAQ each question
+   is a resting point, and the page end is too, so it scrolls normally.
+   Mouse and trackpad scrolling is not snapped. */
+.track>div{position:relative}
+.snap{position:absolute;left:0;width:1px;height:1px;pointer-events:none}
+@media (hover:none) and (pointer:coarse){
+  html.steps{scroll-snap-type:y mandatory}   /* switched on by story.js once the steps exist */
+  .snap{scroll-snap-align:start;scroll-snap-stop:always}
+  .faq,.faq details{scroll-snap-align:start}
+  footer{scroll-snap-align:end}
+}
 
 /* About a fifth less scrolling on phones. */
 @media (max-width:800px){
@@ -455,16 +467,20 @@ header.title-hidden .site-title{opacity:0}
 
 /* ==========================================================================
    Pacing. Each chapter is as long as what it holds: about a screen per photo,
-   less for a single move. Phones get a little more room per photo than they
-   had with snapping, so an ordinary flick moves through one change at a time.
+   less for a single move. On touch screens the steps (above) set the pace;
+   these lengths set how far each step travels, and so how long it plays.
    ========================================================================== */
 .track>#opening{height:120svh}.track>#construction{height:135svh}
 .track>#health{height:190svh}.track>#education{height:140svh}.track>#training{height:160svh}
 .track>#together{height:150svh}.track>#community{height:120svh}.track>#partners{height:130svh}
-@media (max-width:800px){
-  .track>#opening{height:100svh}.track>#construction{height:115svh}
-  .track>#health{height:180svh}.track>#education{height:130svh}.track>#training{height:150svh}
-  .track>#together{height:130svh}.track>#community{height:110svh}.track>#partners{height:110svh}
+/* Phones and tablets (anything that steps): lengths chosen so the long steps
+   (chapter to chapter) are each about one screen, and the photo steps a third
+   of a screen or so. */
+@media (max-width:800px),(hover:none) and (pointer:coarse){
+  .track>#opening{height:75svh}.track>#construction{height:80svh}
+  .track>#health{height:160svh}.track>#education{height:120svh}.track>#training{height:140svh}
+  .track>#together{height:120svh}.track>#community{height:90svh}.track>#partners{height:110svh}
+  .track>.exit{height:50svh}
 }
 
 /* Past the story, the header gets a solid background so the FAQ text never

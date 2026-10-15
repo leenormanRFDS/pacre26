@@ -1,0 +1,173 @@
+(() => {
+const panels=[...document.querySelectorAll('.panel')],anchors=[...document.querySelectorAll('.track>div[id]')],dots=[...document.querySelectorAll('.chapters a')];
+const a=document.querySelector('#photo-a'),b=document.querySelector('#photo-b'),mask=document.querySelector('#mask-path'),contour=document.querySelector('#contour-path'),caption=document.querySelector('#visual-caption')||{},motion=document.querySelector('#motion');
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');let paused=reduced.matches,smooth=0,last=performance.now(),beat=-1;
+/* How the picture follows the scroll. It eases toward the scroll position
+   (FOLLOW_MS) and never runs faster than MAX_RATE chapters a second, so a hard
+   flick plays each change through instead of flashing past it. A jump of more
+   than JUMP chapters (a chapter link, the FAQ link) skips to one chapter short
+   of where it is going and plays only the last change. Touch screens follow a
+   little more softly than a mouse or trackpad. */
+const touch=matchMedia('(hover:none) and (pointer:coarse)');
+const FOLLOW_MS={touch:300,other:130},MAX_RATE={touch:1.5,other:3},JUMP=2.5;
+/* The building closing at the start of Together. On touch screens this is the
+   one stretch the reader drives by hand (see FREE below): the picture follows
+   the finger closely (FREE_FOLLOW_MS). However fast the scroll or flick, the
+   close itself never runs faster than CLOSE_RATE chapters a second, so even a
+   quick flick through it takes about three-quarters of a second. */
+const CLOSE_ZONE=[4.98,5.44],CLOSE_RATE=.55,FREE_FOLLOW_MS=140;
+const photos=[195,195,'care','sota','training',198,194,197],labels=['THE CENTRE','CONSTRUCTION COMPLETE','HEALTH','EDUCATION','TRAINING','TOGETHER UNDER ONE ROOF','OUR COMMUNITIES','OUR PARTNERS'];
+// Manual, normalized vector interpretations of observed architecture. These are
+// presentation masks, not survey-accurate architectural outlines.
+const shapes={corner:[.17,.06,.98,.94,.07,.02,.86,.76,.24,.14],band:[.21,.19,.98,.81,.10,.025,.78,.68,.32,.22],opening:[.26,.09,.98,.91,.09,.015,.84,.70,.30,.16]};
+const shapeNames=['corner','band','corner','opening','opening','band','corner','band'];const clamp=(x,l=0,h=1)=>Math.max(l,Math.min(h,x));const ease=x=>{x=clamp(x);return x*x*(3-2*x)};
+// Phones get the 1200px photographs (about a third of the bytes); everything else gets 2200px.
+const phone=matchMedia('(max-width:800px)');
+function imageUrl(n){return `assets/PACRE-${n}-${phone.matches?1200:2200}.webp`}
+function setPhoto(node,n){node.style.backgroundImage=`url('${imageUrl(n)}')`;node.style.backgroundSize=n==='drone'?'contain':'';node.style.backgroundPosition=n===191?'43% 54%':n===198?'48% 53%':n===197?'53% 60%':n==='care'?'50% 30%':n==='sota'?'50% 62%':n==='clinic'?'45% 40%':n==='training'?'66% 35%':'50% 50%'}
+// Photographs that are not project photography get their own caption.
+const photoCaptions={care:'RFDS PRIMARY HEALTH CARE',clinic:'RFDS RURAL GENERALIST INTERN',training:'RFDS RURAL & REMOTE RETRIEVAL COURSE'};
+const photoCaption=n=>photoCaptions[n]||`PROJECT PHOTOGRAPHY · PACRE-${n}${n===192?' · ARCHITECTURAL DETAIL':''}`;
+/* Photos for each floor. Each one grows out of the blue floor, holds, then flies
+   into the middle of the building, one at a time; the roof then seals them in.
+   Entries marked STAND-IN are placeholders until the right photograph arrives:
+   replace the id (a file assets/PACRE-<id>-1200/2200.webp) and the focus point. */
+const FLOOR_PHOTOS={
+  2:[['care','50% 30%'],[191,'45% 55%'],[190,'50% 55%']],            // Health: primary care, consult room, reception
+  3:[['sota','50% 62%']],                                             // Education: School of the Air
+  4:[['training','66% 35%'],['clinic','45% 40%']]                     // Training: retrieval course, rural generalist intern
+};
+const PHOTO_START=.34,PHOTO_END=.93;   // share of each chapter given to its photos
+const visualBox=document.querySelector('.visual'),cardLayer=document.createElement('div');cardLayer.className='floor-photos';visualBox.appendChild(cardLayer);
+const cards={};for(const b in FLOOR_PHOTOS)cards[b]=FLOOR_PHOTOS[b].map(([id,pos])=>{const el=document.createElement('div');el.className='floor-photo';el.dataset.id=id;const img=document.createElement('img');img.alt='';img.decoding='async';img.style.objectPosition=pos;el.appendChild(img);cardLayer.appendChild(el);return el});
+/* A card only appears once its photograph is downloaded and decoded, so it can
+   never show up as an empty white frame. All of them start loading as soon as
+   the reader starts scrolling, so a fast reader does not outrun them. */
+/* Steps. On phones and tablets the story moves one step per flick and cannot
+   be flicked past a step (style.css makes these points mandatory stops). Each
+   step is a composed moment: a chapter settled, or one of its photos at its
+   fullest. Positions are shares of each chapter's scroll length. */
+const STEPS={0:[0],1:[.25],5:[.86],6:[.35],7:[.45]};
+for(const b in FLOOR_PHOTOS){const n=FLOOR_PHOTOS[b].length,L=(PHOTO_END-PHOTO_START)/n;STEPS[b]=[.3,...FLOOR_PHOTOS[b].map((_,k)=>PHOTO_START+(k+.48)*L)]}
+for(const b in STEPS)for(const at of STEPS[b]){const m=document.createElement('i');m.className='snap';m.style.top=(at*100).toFixed(2)+'%';anchors[b].appendChild(m)}
+/* The free stretch: from the last Training photo until the building has
+   closed (FREE_TO, the end of the close in Together) there are no steps. One
+   tall snap area covers it, and the browser lets a scroll rest anywhere inside
+   an area taller than the screen, so the reader drags the building shut at
+   their own pace and can stop halfway. Browsers only allow that when the next
+   step is at least a screen further on, so the Together step sits about a
+   screen after the close: that last step plays the real building and the
+   headline arriving, then settles. A flick still stops at the start of the
+   stretch and at the Together step, so it never carries the reader past the
+   close. The area's height is set in measure(): the stretch plus one screen. */
+const FREE_FROM=STEPS[4][STEPS[4].length-1],FREE_TO=.26,free=document.createElement('i');free.className='free';free.style.top=(FREE_FROM*100).toFixed(2)+'%';anchors[4].appendChild(free);
+// Snapping only starts now: switched on with no story steps in place, the page
+// would settle on the nearest point it could find, the FAQ.
+document.documentElement.classList.add('steps');
+let cardsRequested=false;
+function loadCards(){if(cardsRequested)return;cardsRequested=true;for(const b in cards)for(const el of cards[b]){const img=el.firstChild;img.src=imageUrl(el.dataset.id);const done=()=>{el.dataset.ready='1';dirty=true};(img.decode?img.decode():new Promise((ok,no)=>{img.onload=ok;img.onerror=no})).then(done,()=>{if(img.complete&&img.naturalWidth)done()})}}
+function placeCards(i,p){
+  const box=cardBox||(cardBox=visualBox.getBoundingClientRect()),W=Math.min(box.width*.8,box.height*.78*1.5),H=W/1.5,cx=box.width/2,cy=box.height*.48;
+  const an=window.rfdsAnchors||{},floor=an.floor||[cx,box.height*.7],core=an.core||[cx,cy];
+  for(const b in cards){const list=cards[b],n=list.length,L=(PHOTO_END-PHOTO_START)/n;
+    list.forEach((el,k)=>{
+      const t=+b===i?(p-(PHOTO_START+k*L))/L:-1;
+      if(t<=0||t>=1||!el.dataset.ready){el.style.opacity='0';return}
+      el.style.width=W+'px';el.style.height=H+'px';
+      let x=cx,y=cy,s=1,o=1;
+      if(paused){o=ease(t/.15)*(1-ease((t-.85)/.15))}
+      else{const g=ease(t/.28),f=ease((t-.68)/.32);
+        if(t<.28){x=floor[0]+(cx-floor[0])*g;y=floor[1]+(cy-floor[1])*g;s=.06+.94*g;o=ease(t/.1)}
+        else if(t>.68){x=cx+(core[0]-cx)*f;y=cy+(core[1]-cy)*f;s=1-.96*f;o=1-ease((t-.86)/.14)}}
+      el.style.opacity=String(o);el.style.transform=`translate(${(x-W/2).toFixed(1)}px,${(y-H/2).toFixed(1)}px) scale(${s.toFixed(4)})`;
+    })}
+}
+const together2=document.querySelector('.together-2'),mapEl=document.querySelector('#map'),mapCredits=document.querySelector('#map-credits');
+function shape(v){const [x,y,r,bt,c,l,cy,ey,sy,ty]=v;const d=`M ${x} ${y} H ${r} V ${bt} H ${x} C ${c} ${bt} ${l} ${cy} ${l} ${ey} V ${sy} C ${l} ${ty} ${c} ${y} ${x} ${y} Z`;mask.setAttribute('d',d);contour.setAttribute('d',d.replace(/\d*\.?\d+/g,n=>String(+n*1000)))}
+// Phone layout: the visual takes whatever height is left once the header, the
+// chapter bar and the active text panel have been measured, so nothing can overlap.
+const stage=document.querySelector('.presentation'),head=document.querySelector('header'),canvas=document.querySelector('#model-canvas');
+const openWrap=document.querySelector('#open-wrap'),droneWrap=document.querySelector('#drone-wrap'),openImg=document.querySelector('#photo-open'),droneImg=document.querySelector('#photo-drone');
+// Cut-outs with transparent backgrounds. The aerial one loads once the story is under way.
+const cutoutUrl=name=>`assets/PACRE-${name}-${phone.matches?1200:2200}.webp`;openImg.src=cutoutUrl('198-cutout');
+let droneLoaded=false;function loadDrone(){if(!droneLoaded){droneLoaded=true;droneImg.src=cutoutUrl('drone')}}
+/* Headlines keep the line breaks written in the copy. If any line is too wide
+   for its column (or would run into the visual), every chapter headline steps
+   down to the size that fits, so they stay consistent with each other. This
+   re-runs on resize and when the web font arrives, so copy edits are safe. */
+let fitWidth=0;
+function fitHeadlines(){fitWidth=innerWidth;const hs=[...document.querySelectorAll('.panel h2')];if(!hs.length)return;hs.forEach(h=>h.style.fontSize='');const vis=document.querySelector('.visual').getBoundingClientRect();let k=1;
+for(const h of hs){const pr=h.closest('.panel').getBoundingClientRect(),avail=phone.matches||vis.left<pr.left+40?pr.width:Math.min(pr.width,vis.left-pr.left-24);h.style.whiteSpace='nowrap';const need=h.scrollWidth;h.style.whiteSpace='';if(need>avail)k=Math.min(k,avail/need)}
+if(k<1){const size=Math.max(28,Math.floor(parseFloat(getComputedStyle(hs[0]).fontSize)*k))+'px';hs.forEach(h=>h.style.fontSize=size)}}
+/* Phones stack the picture above the text, and the picture takes the height the
+   text leaves. The first six chapters share one height (the tallest of their
+   texts), so the 3D model never changes size between chapters, and its canvas
+   is never resized (which blanks it) at a chapter change. The two map chapters
+   size to their own text; story.js fades the map out and in around that change. */
+function layout(){cardBox=null;dirty=true;stage.style.setProperty('--head-h',head.offsetHeight+'px');
+  let h=0;if(phone.matches){const k=Math.max(0,beat);h=k<=5?Math.max(...panels.slice(0,6).map(n=>n.offsetHeight)):panels[k].offsetHeight}
+  stage.style.setProperty('--text-h',h+'px')}
+/* Performance: chapter positions, the page height and the photo frame size are
+   measured once (and again on resize or when fonts load), never per frame, and
+   the loop does nothing at all while the page is still. */
+let anchorTops=[],anchorHeights=[],journeyRange=1,cardBox=null,dirty=true,lastKey='',mapWasReady=false;
+const progressBar=document.querySelector('#progress'),journey=document.querySelector('#journey');
+function measure(){anchorTops=anchors.map(n=>n.offsetTop);anchorHeights=anchors.map(n=>n.offsetHeight);free.style.height=Math.round((1-FREE_FROM)*anchorHeights[4]+FREE_TO*anchorHeights[5]+innerHeight)+'px';journeyRange=Math.max(1,journey.offsetHeight-innerHeight);cardBox=null;dirty=true}
+function destination(){const y=scrollY;let i=0;while(i<anchorTops.length-1&&y>=anchorTops[i+1])i++;return i+clamp((y-anchorTops[i])/anchorHeights[i],0,.99999)}
+function update(now){const dt=Math.max(0,Math.min(80,now-last));last=now;const target=destination();
+if(paused)smooth=target;else{const k=touch.matches?'touch':'other';let gap=target-smooth;if(Math.abs(gap)>JUMP){smooth=target-Math.sign(gap);gap=target-smooth}const slow=smooth>=CLOSE_ZONE[0]&&smooth<=CLOSE_ZONE[1],inFree=k==='touch'&&smooth>=4+FREE_FROM-.01&&smooth<=5+FREE_TO+.01,step=gap*(1-Math.exp(-dt/(inFree?FREE_FOLLOW_MS:FOLLOW_MS[k]))),cap=(slow?Math.min(MAX_RATE[k],CLOSE_RATE):MAX_RATE[k])*dt/1000;smooth+=clamp(step,-cap,cap)}
+if(Math.abs(target-smooth)<1e-4)smooth=target;
+{const an=window.rfdsAnchors,key=[smooth.toFixed(5),!!window.rfdsModelReady,!!window.rfdsMapReady,paused,an?String(an.floor)+an.core:''].join('|');if(!dirty&&key===lastKey){requestAnimationFrame(update);return}lastKey=key;dirty=false}const i=Math.max(0,Math.min(7,Math.floor(smooth))),p=smooth-i;
+if(i>0||p>.12)loadCards();
+if(beat!==i){beat=i;layout();const mapShows=()=>window.rfdsMapReady&&!window.rfdsMapError;if(!(i>=6&&mapShows()))setPhoto(a,photos[i]);if(!(i+1>=6&&mapShows()))setPhoto(b,photos[Math.min(i+1,7)]);if(i>=3)loadDrone();dots.forEach((d,j)=>{if(j===i)d.setAttribute('aria-current','step');else d.removeAttribute('aria-current')});panels.forEach((el,j)=>{el.classList.toggle('active',j===i);el.inert=j!==i})}
+panels.forEach((el,j)=>{el.style.opacity=j===i?String((i===0?1:ease(p/.10))*(i===7?1:(1-ease((p-.89)/.11)))):'0';if(paused&&j===i)el.style.opacity='1';el.style.translate=j===i&&!paused?`0 ${14*(1-ease(p/.14))}px`:'0 0'});
+/* What is on screen in this chapter. Each value is an opacity from 0 to 1.
+   photoA  the chapter's framed photograph       photoB  the next chapter's photograph
+   open    the PACRE-198 cut-out (opening)        drone   the aerial cut-out (together)
+   model   the 3D model canvas
+   The cut-outs are placed by model.js so they sit exactly on the model,
+   which is what lets one dissolve into the other.                          */
+const ready=!!window.rfdsModelReady,mapReady=!!window.rfdsMapReady;if(mapReady&&!mapWasReady){mapWasReady=true;if(i>=5){stage.classList.add('map-arriving');setTimeout(()=>stage.classList.remove('map-arriving'),900)}}let photoA=1,photoB=0,open=0,drone=0,model=0,sweep=1,push=1,map=0;
+if(i===0){photoA=0;photoB=ease((p-.86)/.14);open=1-photoB}
+else if(i===1){if(ready){photoA=1-ease((p-.70)/.10);model=ease((p-.80)/.15);open=ease((p-.70)/.10)*(1-model)}}
+else if(i>=2&&i<=4){if(ready){photoA=0;model=1}else photoA=1}
+// Phones: the picture frame changes height after Together and again for Partners
+// (the text under it changes height), so there it fades out and back in, in step
+// with the text, instead of jumping to the new size in view.
+const fade=phone.matches&&!paused;
+if(i===5){photoA=0;const h=ease((p-.89)/.11),leave=1-h;photoB=fade?0:h;if(mapReady){map=photoB;photoB=0}if(ready){const r=ease((p-.28)/.14);model=1-r;drone=leave;sweep=paused?1:r;if(paused)drone*=r;push=paused?1:1+.025*ease((p-.42)/.58)}else drone=leave;if(mapReady)drone=leave*(paused&&ready?ease((p-.28)/.14):1)}
+else if(i>5)photoB=ease((p-.86)/.14);
+if(i>5)photoA=1-photoB;
+if(i>5&&mapReady){map=1;photoA=0;photoB=0}
+if(i>5&&fade){const show=ease(p/.12)*(i===7?1:1-ease((p-.86)/.14));if(mapReady)map=show;else{photoA=show;photoB=0}}
+// Together: the whole headline and copy arrive with the real building.
+if(i===5&&!paused&&ready){const r=ease((p-.28)/.14);panels[5].style.opacity=String(r*(1-ease((p-.89)/.11)));panels[5].style.translate=`0 ${14*(1-r)}px`}
+/* Text panels and the map are also hidden once faded right out. On iPhone, Safari can leave the last
+   faint frame of a fading headline painted on screen (a "ghost") when only the
+   opacity reaches zero; hiding it makes Safari repaint that part of the screen. */
+for(const el of panels)el.style.visibility=+el.style.opacity>0?'':'hidden';
+mapEl.style.opacity=String(map);mapCredits.style.opacity=String(map);mapEl.style.visibility=mapCredits.style.visibility=map>0?'':'hidden';mapEl.style.pointerEvents=map>.6?'auto':'none';
+head.classList.toggle('title-hidden',i===0&&p<.8);
+a.style.opacity=String(photoA);b.style.opacity=String(photoB);a.style.transform=paused?'none':`scale(${1.015-.015*ease(p)})`;
+openWrap.style.opacity=String(open);openWrap.style.transform=i===0&&!paused?`translate(0,${-3*ease(p)}%) scale(${1-.03*ease(p)})`:'none';
+droneWrap.style.opacity=String(drone);droneWrap.style.transform=`scale(${push})`;
+// The aerial photo appears from the roof down: a soft-edged mask sweeps over it.
+const edge=sweep>=1?'#000 100%':`#000 ${(sweep*118-18).toFixed(1)}%,transparent ${(sweep*118).toFixed(1)}%`;droneImg.style.webkitMaskImage=droneImg.style.maskImage=sweep>=1?'none':`linear-gradient(to bottom,${edge})`;
+const from=shapes[shapeNames[i]],to=shapes[shapeNames[Math.min(i+1,7)]],t=paused?0:ease((p-.82)/.18);shape(from.map((x,j)=>x+(to[j]-x)*t));
+canvas.style.opacity=String(model);contour.style.opacity=String(.35*Math.max(photoA,photoB,map));
+const top=Math.max(photoA,photoB,open,drone*sweep,model,map);caption.textContent=top===map&&map>0?(i>=7||(i===6&&p>.9)?'OUTBACK SOUTH AUSTRALIA · SATELLITE':'PORT AUGUSTA · SATELLITE'):top===model&&model>0?'V4 IVORY MODEL · SCHEMATIC PREVIEW':top===drone*sweep&&drone>0?'PROJECT PHOTOGRAPHY · AERIAL':top===open&&open>0?'PROJECT PHOTOGRAPHY · PACRE-198':top===photoB?photoCaption(photos[Math.min(i+1,7)]):photoCaption(photos[i]);
+const photoAlpha=1-model;
+cardLayer.style.display=ready?'':'none';if(ready)placeCards(i,p);
+window.rfdsStory={beat:i,local:p,paused,visible:(i>=2&&i<=5)||(i===1&&p>=.75),photoAlpha,modelAlpha:model};progressBar.style.width=`${100*clamp(scrollY/journeyRange)}%`;requestAnimationFrame(update)}
+if(motion)motion.onclick=()=>{paused=!paused;motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))};if(paused&&motion){motion.textContent='Resume motion';motion.setAttribute('aria-pressed','true')}
+// Phone browsers resize the window as their toolbars slide in and out while
+// scrolling; the headlines only need re-fitting when the width changes.
+addEventListener('resize',()=>{if(innerWidth!==fitWidth)fitHeadlines();beat=-1;measure()});reduced.addEventListener('change',e=>{paused=e.matches;if(motion){motion.textContent=paused?'Resume motion':'Pause motion';motion.setAttribute('aria-pressed',String(paused))}});
+// Keyboard and chapter links use native document scrolling; wheel and touch are never hijacked.
+for(const link of document.querySelectorAll('a[href^="#"]'))link.addEventListener('click',e=>{const node=document.querySelector(link.getAttribute('href'));if(!node)return;e.preventDefault();const y=node.closest('.track')?node.offsetTop+node.offsetHeight*.18:node.getBoundingClientRect().top+scrollY-(parseFloat(getComputedStyle(node).scrollMarginTop)||0);scrollTo({top:y,behavior:paused?'instant':'smooth'});history.replaceState(null,'',link.getAttribute('href'))});
+const query=new URLSearchParams(location.search);if(query.has('scene')){const index=['opening','construction','health','education','training','together','community','partners'].indexOf(query.get('scene'));if(index>=0)scrollTo(0,anchors[index].offsetTop+anchors[index].offsetHeight*clamp(Number(query.get('phase')||.35),.01,.98))}
+fitHeadlines();measure();smooth=destination();setPhoto(a,195);panels[0].style.opacity='1';requestAnimationFrame(update);
+const refresh=()=>{fitHeadlines();measure();layout()};
+if(document.fonts){document.fonts.ready.then(refresh);document.fonts.addEventListener('loadingdone',refresh)}addEventListener('load',refresh);
+requestAnimationFrame(()=>requestAnimationFrame(()=>stage.classList.add('ready')));
+})();

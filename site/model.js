@@ -173,7 +173,7 @@ const DRONE = {
 // Index = story beat: 0 opening, 1 construction, 2 health, 3 education,
 // 4 training, 5 together under one roof, 6 community, 7 partners.
 const VIEW_FOR_BEAT = [OPENING, OPENING, HEALTH, EDUCATION, TRAINING, DRONE, DRONE, DRONE];
-const BLEND_LENGTH = {5: 0.22};   // share of the chapter spent moving; Together shuts quickly, then the real building resolves
+const BLEND_LENGTH = {5: 0.26};   // share of the chapter spent moving; Together closes over the first 26% (by hand on touch screens), then the real building resolves
 const DEFAULT_BLEND_LENGTH = 0.32;
 
 // Within Health, Education and Training the camera keeps turning slowly after

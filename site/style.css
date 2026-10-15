@@ -244,10 +244,11 @@
    is a resting point, and the page end is too, so it scrolls normally.
    Mouse and trackpad scrolling is not snapped. */
 .track>div{position:relative}
-.snap{position:absolute;left:0;width:1px;height:1px;pointer-events:none}
+.snap,.free{position:absolute;left:0;width:1px;height:1px;pointer-events:none}
 @media (hover:none) and (pointer:coarse){
   html.steps{scroll-snap-type:y mandatory}   /* switched on by story.js once the steps exist */
   .snap{scroll-snap-align:start;scroll-snap-stop:always}
+  .free{scroll-snap-align:start;scroll-snap-stop:always}   /* the close: one tall area, free to scroll within */
   .faq,.faq details{scroll-snap-align:start}
   footer{scroll-snap-align:end}
 }
@@ -479,7 +480,7 @@ header.title-hidden .site-title{opacity:0}
 @media (max-width:800px),(hover:none) and (pointer:coarse){
   .track>#opening{height:75svh}.track>#construction{height:80svh}
   .track>#health{height:160svh}.track>#education{height:120svh}.track>#training{height:140svh}
-  .track>#together{height:120svh}.track>#community{height:90svh}.track>#partners{height:110svh}
+  .track>#together{height:200svh}.track>#community{height:90svh}.track>#partners{height:110svh}
   .track>.exit{height:50svh}
 }
 

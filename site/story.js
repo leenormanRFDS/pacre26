@@ -10,6 +10,12 @@ const reduced=matchMedia('(prefers-reduced-motion: reduce)');let paused=reduced.
    little more softly than a mouse or trackpad. */
 const touch=matchMedia('(hover:none) and (pointer:coarse)');
 const FOLLOW_MS={touch:300,other:130},MAX_RATE={touch:1.5,other:3},JUMP=2.5;
+/* The building closing at the start of Together. On touch screens this is the
+   one stretch the reader drives by hand (see FREE below): the picture follows
+   the finger closely (FREE_FOLLOW_MS). However fast the scroll or flick, the
+   close itself never runs faster than CLOSE_RATE chapters a second, so even a
+   quick flick through it takes about three-quarters of a second. */
+const CLOSE_ZONE=[4.98,5.44],CLOSE_RATE=.55,FREE_FOLLOW_MS=140;
 const photos=[195,195,'care','sota','training',198,194,197],labels=['THE CENTRE','CONSTRUCTION COMPLETE','HEALTH','EDUCATION','TRAINING','TOGETHER UNDER ONE ROOF','OUR COMMUNITIES','OUR PARTNERS'];
 // Manual, normalized vector interpretations of observed architecture. These are
 // presentation masks, not survey-accurate architectural outlines.
@@ -41,9 +47,20 @@ const cards={};for(const b in FLOOR_PHOTOS)cards[b]=FLOOR_PHOTOS[b].map(([id,pos
    be flicked past a step (style.css makes these points mandatory stops). Each
    step is a composed moment: a chapter settled, or one of its photos at its
    fullest. Positions are shares of each chapter's scroll length. */
-const STEPS={0:[0],1:[.25],5:[.45],6:[.35],7:[.45]};
+const STEPS={0:[0],1:[.25],5:[.86],6:[.35],7:[.45]};
 for(const b in FLOOR_PHOTOS){const n=FLOOR_PHOTOS[b].length,L=(PHOTO_END-PHOTO_START)/n;STEPS[b]=[.3,...FLOOR_PHOTOS[b].map((_,k)=>PHOTO_START+(k+.48)*L)]}
 for(const b in STEPS)for(const at of STEPS[b]){const m=document.createElement('i');m.className='snap';m.style.top=(at*100).toFixed(2)+'%';anchors[b].appendChild(m)}
+/* The free stretch: from the last Training photo until the building has
+   closed (FREE_TO, the end of the close in Together) there are no steps. One
+   tall snap area covers it, and the browser lets a scroll rest anywhere inside
+   an area taller than the screen, so the reader drags the building shut at
+   their own pace and can stop halfway. Browsers only allow that when the next
+   step is at least a screen further on, so the Together step sits about a
+   screen after the close: that last step plays the real building and the
+   headline arriving, then settles. A flick still stops at the start of the
+   stretch and at the Together step, so it never carries the reader past the
+   close. The area's height is set in measure(): the stretch plus one screen. */
+const FREE_FROM=STEPS[4][STEPS[4].length-1],FREE_TO=.26,free=document.createElement('i');free.className='free';free.style.top=(FREE_FROM*100).toFixed(2)+'%';anchors[4].appendChild(free);
 // Snapping only starts now: switched on with no story steps in place, the page
 // would settle on the nearest point it could find, the FAQ.
 document.documentElement.classList.add('steps');
@@ -95,10 +112,10 @@ function layout(){cardBox=null;dirty=true;stage.style.setProperty('--head-h',hea
    the loop does nothing at all while the page is still. */
 let anchorTops=[],anchorHeights=[],journeyRange=1,cardBox=null,dirty=true,lastKey='',mapWasReady=false;
 const progressBar=document.querySelector('#progress'),journey=document.querySelector('#journey');
-function measure(){anchorTops=anchors.map(n=>n.offsetTop);anchorHeights=anchors.map(n=>n.offsetHeight);journeyRange=Math.max(1,journey.offsetHeight-innerHeight);cardBox=null;dirty=true}
+function measure(){anchorTops=anchors.map(n=>n.offsetTop);anchorHeights=anchors.map(n=>n.offsetHeight);free.style.height=Math.round((1-FREE_FROM)*anchorHeights[4]+FREE_TO*anchorHeights[5]+innerHeight)+'px';journeyRange=Math.max(1,journey.offsetHeight-innerHeight);cardBox=null;dirty=true}
 function destination(){const y=scrollY;let i=0;while(i<anchorTops.length-1&&y>=anchorTops[i+1])i++;return i+clamp((y-anchorTops[i])/anchorHeights[i],0,.99999)}
 function update(now){const dt=Math.max(0,Math.min(80,now-last));last=now;const target=destination();
-if(paused)smooth=target;else{const k=touch.matches?'touch':'other';let gap=target-smooth;if(Math.abs(gap)>JUMP){smooth=target-Math.sign(gap);gap=target-smooth}const step=gap*(1-Math.exp(-dt/FOLLOW_MS[k])),cap=MAX_RATE[k]*dt/1000;smooth+=clamp(step,-cap,cap)}
+if(paused)smooth=target;else{const k=touch.matches?'touch':'other';let gap=target-smooth;if(Math.abs(gap)>JUMP){smooth=target-Math.sign(gap);gap=target-smooth}const slow=smooth>=CLOSE_ZONE[0]&&smooth<=CLOSE_ZONE[1],inFree=k==='touch'&&smooth>=4+FREE_FROM-.01&&smooth<=5+FREE_TO+.01,step=gap*(1-Math.exp(-dt/(inFree?FREE_FOLLOW_MS:FOLLOW_MS[k]))),cap=(slow?Math.min(MAX_RATE[k],CLOSE_RATE):MAX_RATE[k])*dt/1000;smooth+=clamp(step,-cap,cap)}
 if(Math.abs(target-smooth)<1e-4)smooth=target;
 {const an=window.rfdsAnchors,key=[smooth.toFixed(5),!!window.rfdsModelReady,!!window.rfdsMapReady,paused,an?String(an.floor)+an.core:''].join('|');if(!dirty&&key===lastKey){requestAnimationFrame(update);return}lastKey=key;dirty=false}const i=Math.max(0,Math.min(7,Math.floor(smooth))),p=smooth-i;
 if(i>0||p>.12)loadCards();
@@ -118,13 +135,13 @@ else if(i>=2&&i<=4){if(ready){photoA=0;model=1}else photoA=1}
 // (the text under it changes height), so there it fades out and back in, in step
 // with the text, instead of jumping to the new size in view.
 const fade=phone.matches&&!paused;
-if(i===5){photoA=0;const h=ease((p-.89)/.11),leave=1-h;photoB=fade?0:h;if(mapReady){map=photoB;photoB=0}if(ready){const r=ease((p-.24)/.12);model=1-r;drone=leave;sweep=paused?1:r;if(paused)drone*=r;push=paused?1:1+.025*ease((p-.36)/.64)}else drone=leave;if(mapReady)drone=leave*(paused&&ready?ease((p-.24)/.12):1)}
+if(i===5){photoA=0;const h=ease((p-.89)/.11),leave=1-h;photoB=fade?0:h;if(mapReady){map=photoB;photoB=0}if(ready){const r=ease((p-.28)/.14);model=1-r;drone=leave;sweep=paused?1:r;if(paused)drone*=r;push=paused?1:1+.025*ease((p-.42)/.58)}else drone=leave;if(mapReady)drone=leave*(paused&&ready?ease((p-.28)/.14):1)}
 else if(i>5)photoB=ease((p-.86)/.14);
 if(i>5)photoA=1-photoB;
 if(i>5&&mapReady){map=1;photoA=0;photoB=0}
 if(i>5&&fade){const show=ease(p/.12)*(i===7?1:1-ease((p-.86)/.14));if(mapReady)map=show;else{photoA=show;photoB=0}}
 // Together: the whole headline and copy arrive with the real building.
-if(i===5&&!paused&&ready){const r=ease((p-.24)/.12);panels[5].style.opacity=String(r*(1-ease((p-.89)/.11)));panels[5].style.translate=`0 ${14*(1-r)}px`}
+if(i===5&&!paused&&ready){const r=ease((p-.28)/.14);panels[5].style.opacity=String(r*(1-ease((p-.89)/.11)));panels[5].style.translate=`0 ${14*(1-r)}px`}
 /* Text panels and the map are also hidden once faded right out. On iPhone, Safari can leave the last
    faint frame of a fading headline painted on screen (a "ghost") when only the
    opacity reaches zero; hiding it makes Safari repaint that part of the screen. */

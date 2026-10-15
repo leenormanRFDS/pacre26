@@ -115,7 +115,11 @@ if(i>5&&mapReady){map=1;photoA=0;photoB=0}
 if(i>5&&fade){const show=ease(p/.12)*(i===7?1:1-ease((p-.86)/.14));if(mapReady)map=show;else{photoA=show;photoB=0}}
 // Together: the whole headline and copy arrive with the real building.
 if(i===5&&!paused&&ready){const r=ease((p-.24)/.12);panels[5].style.opacity=String(r*(1-ease((p-.89)/.11)));panels[5].style.translate=`0 ${14*(1-r)}px`}
-mapEl.style.opacity=String(map);mapCredits.style.opacity=String(map);mapEl.style.pointerEvents=map>.6?'auto':'none';
+/* Text panels and the map are also hidden once faded right out. On iPhone, Safari can leave the last
+   faint frame of a fading headline painted on screen (a "ghost") when only the
+   opacity reaches zero; hiding it makes Safari repaint that part of the screen. */
+for(const el of panels)el.style.visibility=+el.style.opacity>0?'':'hidden';
+mapEl.style.opacity=String(map);mapCredits.style.opacity=String(map);mapEl.style.visibility=mapCredits.style.visibility=map>0?'':'hidden';mapEl.style.pointerEvents=map>.6?'auto':'none';
 head.classList.toggle('title-hidden',i===0&&p<.8);
 a.style.opacity=String(photoA);b.style.opacity=String(photoB);a.style.transform=paused?'none':`scale(${1.015-.015*ease(p)})`;
 openWrap.style.opacity=String(open);openWrap.style.transform=i===0&&!paused?`translate(0,${-3*ease(p)}%) scale(${1-.03*ease(p)})`:'none';

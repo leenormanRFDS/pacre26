@@ -73,7 +73,12 @@
      edge runs off the screen and the rounded corners sit at the left. */
   .visual{left:-2%;right:auto;width:104%;top:var(--head-h,86px);bottom:calc(var(--dock) + var(--text-h,240px) + 34px);height:auto;min-height:0}
   #model-canvas{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 6%,#000 94%,transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 6%,#000 94%,transparent 100%)}
-  .presentation.ready .visual,.presentation.ready .visual-caption{transition:bottom .45s cubic-bezier(.22,.8,.24,1)}
+  /* No animated resize of the picture frame: it now changes size only while the
+     picture is faded out (story.js), and animating it made Safari re-lay out the
+     screen on every frame of a chapter change. */
+  /* Each text panel gets its own layer, so fading it is handled by the graphics
+     chip instead of repainting the text, and no faded text is left on screen. */
+  .panel{will-change:opacity,transform}
 
   .map-credits{top:calc(var(--head-h,86px) - 6px);right:12px;max-width:70%}
   .visual-caption{left:20px;right:20px;top:auto;bottom:calc(var(--dock) + var(--text-h,240px) + 12px);max-width:none;font-size:10px;letter-spacing:.1em}
@@ -406,15 +411,16 @@ header.title-hidden .site-title{opacity:0}
   box-shadow:inset 0 1px 0 #fff,0 10px 28px -14px rgba(0,70,132,.36),0 2px 6px -3px rgba(0,70,132,.12);
   -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);
   transition:background .25s,border-color .25s,box-shadow .25s,transform .25s}
-.cta span{font-size:14px;color:var(--cyan);transition:transform .25s}
+/* The arrow is drawn, not typed: iPhone shows the ↗ character as an emoji. */
+.cta-arrow{width:11px;height:11px;flex:none;color:var(--cyan);transition:transform .25s}
 .cta:hover{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(255,255,255,.66));border-color:rgba(0,141,199,.5)!important;box-shadow:inset 0 1px 0 #fff,0 14px 32px -14px rgba(0,70,132,.42),0 2px 6px -3px rgba(0,70,132,.14);transform:translateY(-1px)}
-.cta:hover span{transform:translate(2px,-2px)}
+.cta:hover .cta-arrow{transform:translate(2px,-2px)}
 .cta:active{transform:none;box-shadow:inset 0 1px 0 #fff,0 6px 18px -12px rgba(0,70,132,.36)}
-@media (prefers-reduced-motion:reduce){.cta,.cta span{transition:none}.cta:hover,.cta:hover span{transform:none}}
+@media (prefers-reduced-motion:reduce){.cta,.cta-arrow{transition:none}.cta:hover,.cta:hover .cta-arrow{transform:none}}
 .faq{row-gap:0}
 .faq-cta{grid-column:2;margin:40px 0 0}
 @media (max-width:800px){.cta{min-height:46px}.faq-cta{grid-column:auto;margin-top:28px}}
-@media (max-height:520px) and (orientation:landscape){.cta{min-height:40px;font-size:13px;padding:0 18px;gap:8px}.cta span{font-size:12px}}
+@media (max-height:520px) and (orientation:landscape){.cta{min-height:40px;font-size:13px;padding:0 18px;gap:8px}.cta-arrow{width:10px;height:10px}}
 
 /* ==========================================================================
    Map: a still satellite image with the centre marked. Clickable only while
